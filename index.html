@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment Tracker | For Freelancers</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         margin: 0; background: #f5f7fb; color: #1a1a2e; padding-bottom: 40px; }
+  header { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 20px; }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 4px 0 0; font-size: 13px; opacity: .85; }
+  nav { display: flex; background: white; border-bottom: 1px solid #e5e7eb;
+        position: sticky; top: 0; z-index: 10; }
+  .tab { flex: 1; padding: 14px; background: none; border: none; font-size: 14px;
+         cursor: pointer; color: #6b7280; font-weight: 500;
+         border-bottom: 2px solid transparent; }
+  .tab.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+  main { padding: 16px; max-width: 720px; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat { background: white; border-radius: 12px; padding: 14px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .stat .label { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; }
+  .stat .value { font-size: 17px; font-weight: 700; margin-top: 6px; }
+  .stat.pending .value { color: #d97706; }
+  .stat.received .value { color: #16a34a; }
+  .stat.overdue .value { color: #dc2626; }
+  label { display: block; font-size: 13px; font-weight: 500; margin: 10px 0 4px; color: #374151; }
+  input, select, textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db;
+                            border-radius: 8px; font-size: 14px; font-family: inherit; }
+  textarea { resize: vertical; min-height: 60px; }
+  button.primary { width: 100%; padding: 12px; background: #4f46e5; color: white; border: none;
+                   border-radius: 8px; font-size: 15px; font-weight: 600;
+                   cursor: pointer; margin-top: 14px; }
+  button.primary:hover { background: #4338ca; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .item { background: white; border-radius: 10px; padding: 12px; margin-bottom: 10px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .item .top { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+  .item .name { font-weight: 600; font-size: 15px; }
+  .item .meta { font-size: 12px; color: #6b7280; margin-top: 4px; }
+  .badge { display: inline-block; font-size: 11px; padding: 3px 8px;
+           border-radius: 999px; font-weight: 600; }
+  .badge.paid { background: #dcfce7; color: #166534; }
+  .badge.pending { background: #fef3c7; color: #92400e; }
+  .badge.overdue { background: #fee2e2; color: #991b1b; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; }
+  .actions button { padding: 6px 12px; font-size: 12px; border-radius: 6px;
+                    border: 1px solid #d1d5db; background: white; cursor: pointer; }
+  .actions button.pay { border-color: #16a34a; color: #16a34a; }
+  .actions button.del { border-color: #dc2626; color: #dc2626; margin-left: auto; }
+  .empty { text-align: center; padding: 30px; color: #9ca3af; font-size: 14px; }
+  .tools { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tools button { flex: 1; padding: 8px; font-size: 12px; border-radius: 6px;
+                  border: 1px solid #d1d5db; background: white; cursor: pointer; }
+  .section-title { font-size: 15px; font-weight: 600; margin: 16px 0 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💼 Payment Tracker</h1>
+  <p>Simple invoice & payment tracking for freelancers</p>
+</header>
+
+<nav>
+  <button class="tab active" data-view="v-dash">Dashboard</button>
+  <button class="tab" data-view="v-clients">Clients</button>
+  <button class="tab" data-view="v-invoices">Invoices</button>
+</nav>
+
+<main>
+
+  <!-- ============ DASHBOARD ============ -->
+  <section id="v-dash" class="view active">
+    <div class="stats">
+      <div class="stat pending">
+        <div class="label">Total Due</div>
+        <div class="value" id="statPending">₹0</div>
+      </div>
+      <div class="stat received">
+        <div class="label">Received This Month</div>
+        <div class="value" id="statReceived">₹0</div>
+      </div>
+      <div class="stat overdue">
+        <div class="label">Overdue</div>
+        <div class="value" id="statOverdue">0</div>
+      </div>
+    </div>
+    <div class="section-title">Due Soon / Overdue</div>
+    <div id="dashList"></div>
+  </section>
+
+  <!-- ============ CLIENTS ============ -->
+  <section id="v-clients" class="view">
+    <div class="card">
+      <div class="section-title" style="margin-top:0">Add New Client</div>
+      <form id="clientForm">
+        <label>Name *</label>
+        <input id="cName" type="text" required placeholder="e.g. Rahul Sharma">
+        <div class="row">
+          <div>
+            <label>Email</label>
+            <input id="cEmail" type="email" placeholder="rahul@example.com">
+          </div>
+          <div>
+            <label>Phone</label>
+            <input id="cPhone" type="tel" placeholder="+91 98765 43210">
+          </div>
+        </div>
+        <button class="primary" type="submit">Add Client</button>
+      </form>
+    </div>
+    <div class="section-title">Your Clients</div>
+    <div id="clientList"></div>
+  </section>
+
+  <!-- ============ INVOICES ============ -->
+  <section id="v-invoices" class="view">
+    <div class="card">
+      <div class="section-title" style="margin-top:0">Create New Invoice</div>
+      <form id="invoiceForm">
+        <label>Client *</label>
+        <select id="invClient" required></select>
+        <div class="row">
+          <div>
+            <label>Invoice Number</label>
+            <input id="invNumber" type="text" placeholder="INV-001">
+          </div>
+          <div>
+            <label>Amount (₹) *</label>
+            <input id="invAmount" type="number" min="1" step="1" required placeholder="15000">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Invoice Date</label>
+            <input id="invDate" type="date">
+          </div>
+          <div>
+            <label>Due Date</label>
+            <input id="invDue" type="date">
+          </div>
+        </div>
+        <label>Description</label>
+        <textarea id="invDesc" placeholder="e.g. Website design — December"></textarea>
+        <button class="primary" type="submit">Add Invoice</button>
+      </form>
+    </div>
+
+    <div class="tools">
+      <button id="btnExport">⬇ Export Data</button>
+      <button id="btnImport">⬆ Import Data</button>
+      <input id="fileImport" type="file" accept="application/json" style="display:none">
+    </div>
+
+    <div class="section-title">Your Invoices</div>
+    <div id="invoiceList"></div>
+  </section>
+
+</main>
+
+<script>
+/* ================= STATE ================= */
+const STORAGE_KEY = 'fpt_v1';
+let state = { clients: [], invoices: [] };
+
+const $ = s => document.querySelector(s);
+
+/* ================= HELPERS ================= */
+function localDateStr(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+function todayStr() { return localDateStr(); }
+function fmt(n) { return '₹' + Number(n || 0).toLocaleString('en-IN'); }
+function fmtDate(s) {
+  if (!s) return '—';
+  const p = s.split('-');
+  if (p.length !== 3) return s;
+  return `${p[2]}/${p[1]}/${p[0]}`;
+}
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, ch =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+function effStatus(inv) {
+  if (inv.status === 'paid') return 'paid';
+  if (inv.dueDate && inv.dueDate < todayStr()) return 'overdue';
+  return 'pending';
+}
+function statusLabel(st) {
+  return st === 'paid' ? 'Paid' : st === 'overdue' ? 'Overdue' : 'Pending';
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch (e) { console.error(e); }
+  if (!Array.isArray(state.clients)) state.clients = [];
+  if (!Array.isArray(state.invoices)) state.invoices = [];
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
+    'background:#1a1a2e;color:white;padding:10px 20px;border-radius:8px;' +
+    'font-size:14px;z-index:999;opacity:0;transition:opacity .2s;box-shadow:0 4px 12px rgba(0,0,0,.2)';
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.style.opacity = '1');
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 250); }, 1800);
+}
+
+/* ================= RENDER ================= */
+function renderDashboard() {
+  let pending = 0, received = 0, overdue = 0;
+  const monthKey = todayStr().slice(0, 7);
+  state.invoices.forEach(inv => {
+    const st = effStatus(inv);
+    if (st === 'paid') {
+      if ((inv.paidAt || '').slice(0, 7) === monthKey) received += Number(inv.amount || 0);
+    } else {
+      pending += Number(inv.amount || 0);
+      if (st === 'overdue') overdue++;
+    }
+  });
+  $('#statPending').textContent = fmt(pending);
+  $('#statReceived').textContent = fmt(received);
+  $('#statOverdue').textContent = overdue;
+
+  const wrap = $('#dashList');
+  const due = state.invoices
+    .filter(i => effStatus(i) !== 'paid')
+    .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
+    .slice(0, 6);
+  if (due.length === 0) {
+    wrap.innerHTML = '<div class="empty">No pending payments 🎉</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  due.forEach(inv => {
+    const c = state.clients.find(x => x.id === inv.clientId);
+    const st = effStatus(inv);
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `
+      <div class="top">
+        <div>
+          <div class="name">${esc(c ? c.name : 'Unknown')}</div>
+          <div class="meta">Due: ${fmtDate(inv.dueDate)}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="name">${fmt(inv.amount)}</div>
+          <span class="badge ${st}">${statusLabel(st)}</span>
+        </div>
+      </div>`;
+    wrap.appendChild(el);
+  });
+}
+
+function renderClientOptions() {
+  const sel = $('#invClient');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Select a client —</option>';
+  state.clients.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = c.name;
+    sel.appendChild(o);
+  });
+  if (cur) sel.value = cur;
+}
+
+function renderClients() {
+  const wrap = $('#clientList');
+  if (state.clients.length === 0) {
+    wrap.innerHTML = '<div class="empty">No clients yet.</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  state.clients.forEach(c => {
+    const items = state.invoices.filter(i => i.clientId === c.id);
+    const dueAmt = items
+      .filter(i => effStatus(i) !== 'paid')
+      .reduce((s, i) => s + Number(i.amount || 0), 0);
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `
+      <div class="top">
+        <div>
+          <div class="name">${esc(c.name)}</div>
+          <div class="meta">${esc(c.email || '')}${c.email && c.phone ? ' • ' : ''}${esc(c.phone || '')}</div>
+          <div class="meta">${items.length} invoice(s) • Due: <b>${fmt(dueAmt)}</b></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="del" data-del-client="${c.id}">Delete</button>
+      </div>`;
+    wrap.appendChild(el);
+  });
+}
+
+function renderInvoices() {
+  const wrap = $('#invoiceList');
+  if (state.invoices.length === 0) {
+    wrap.innerHTML = '<div class="empty">No invoices yet.</div>';
+    return;
+  }
+  const sorted = [...state.invoices].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  wrap.innerHTML = '';
+  sorted.forEach(inv => {
+    const c = state.clients.find(x => x.id === inv.clientId);
+    const st = effStatus(inv);
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `
+      <div class="top">
+        <div>
+          <div class="name">${esc(c ? c.name : 'Unknown')}
+            <span class="meta">#${esc(inv.number || '')}</span></div>
+          <div class="meta">${fmtDate(inv.date)} → ${fmtDate(inv.dueDate)}</div>
+          ${inv.description ? `<div class="meta">${esc(inv.description)}</div>` : ''}
+        </div>
+        <div style="text-align:right">
+          <div class="name">${fmt(inv.amount)}</div>
+          <span class="badge ${st}">${statusLabel(st)}</span>
+        </div>
+      </div>
+      <div class="actions">
+        ${st !== 'paid' ? `<button class="pay" data-pay="${inv.id}">Mark as Paid</button>` : ''}
+        <button class="del" data-del-inv="${inv.id}">Delete</button>
+      </div>`;
+    wrap.appendChild(el);
+  });
+}
+
+function renderAll() {
+  renderDashboard();
+  renderClientOptions();
+  renderClients();
+  renderInvoices();
+}
+
+/* ================= EVENTS ================= */
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.view).classList.add('active');
+  });
+});
+
+$('#clientForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('#cName').value.trim();
+  if (!name) return;
+  state.clients.push({
+    id: uid(),
+    name,
+    email: $('#cEmail').value.trim(),
+    phone: $('#cPhone').value.trim(),
+    createdAt: new Date().toISOString()
+  });
+  save();
+  e.target.reset();
+  renderAll();
+  toast('Client added ✓');
+});
+
+$('#invoiceForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const clientId = $('#invClient').value;
+  if (!clientId) { toast('Please select a client first'); return; }
+  const amount = Number($('#invAmount').value);
+  if (!amount || amount <= 0) { toast('Please enter a valid amount'); return; }
+
+  state.invoices.push({
+    id: uid(),
+    clientId,
+    number: $('#invNumber').value.trim() || ('INV-' + String(state.invoices.length + 1).padStart(3, '0')),
+    date: $('#invDate').value || todayStr(),
+    dueDate: $('#invDue').value || '',
+    amount,
+    description: $('#invDesc').value.trim(),
+    status: 'pending',
+    paidAt: null
+  });
+  save();
+
+  e.target.reset();
+  $('#invDate').value = todayStr();
+  const d = new Date(); d.setDate(d.getDate() + 14);
+  $('#invDue').value = localDateStr(d);
+  $('#invNumber').value = 'INV-' + String(state.invoices.length + 1).padStart(3, '0');
+
+  renderAll();
+  toast('Invoice added ✓');
+});
+
+document.addEventListener('click', e => {
+  const t = e.target;
+
+  if (t.dataset.delClient) {
+    const id = t.dataset.delClient;
+    const cnt = state.invoices.filter(i => i.clientId === id).length;
+    if (cnt > 0) {
+      if (!confirm(`This client has ${cnt} invoice(s). They will also be deleted. Continue?`)) return;
+      state.invoices = state.invoices.filter(i => i.clientId !== id);
+    }
+    state.clients = state.clients.filter(x => x.id !== id);
+    save(); renderAll(); toast('Deleted');
+  }
+
+  if (t.dataset.delInv) {
+    if (!confirm('Delete this invoice?')) return;
+    state.invoices = state.invoices.filter(i => i.id !== t.dataset.delInv);
+    save(); renderAll(); toast('Deleted');
+  }
+
+  if (t.dataset.pay) {
+    const inv = state.invoices.find(i => i.id === t.dataset.pay);
+    if (!inv) return;
+    inv.status = 'paid';
+    inv.paidAt = new Date().toISOString();
+    save(); renderAll(); toast('Marked as paid ✓');
+  }
+});
+
+$('#btnExport').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `payment-tracker-${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Data downloaded ⬇');
+});
+
+$('#btnImport').addEventListener('click', () => $('#fileImport').click());
+$('#fileImport').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const data = JSON.parse(r.result);
+      if (!Array.isArray(data.clients) || !Array.isArray(data.invoices)) throw new Error('bad');
+      if (!confirm('This will replace your current data. Continue?')) return;
+      state = data;
+      save(); renderAll(); toast('Data imported ⬆');
+    } catch (err) {
+      toast('Invalid file ✗');
+    }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+});
+
+/* ================= INIT ================= */
+function init() {
+  load();
+  $('#invDate').value = todayStr();
+  const d = new Date(); d.setDate(d.getDate() + 14);
+  $('#invDue').value = localDateStr(d);
+  $('#invNumber').value = 'INV-' + String(state.invoices.length + 1).padStart(3, '0');
+  renderAll();
+}
+init();
+</script>
+</body>
+</html>
