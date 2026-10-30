@@ -100,6 +100,7 @@
   const resultBox = document.getElementById('resultBox');
   const resultTitle = document.getElementById('resultTitle');
   const resultDesc = document.getElementById('resultDesc');
+  const resultOrigin = document.getElementById('resultOrigin'); // নতুন
 
   // ফাইল বাছনি কৰিলে নামটো দেখুওৱা
   fileInput.addEventListener('change', function(e) {
@@ -119,7 +120,6 @@
 
     const file = fileInput.files[0];
     
-    // ফাইলৰ ছাইজ চেক কৰা (Gemini API ৰ বাবে ২০ MB তকৈ কম হোৱা ভাল)
     if (file.size > 20 * 1024 * 1024) {
         alert("File is too large. Please upload a file smaller than 20MB.");
         return;
@@ -127,23 +127,19 @@
 
     const reader = new FileReader();
 
-    // লোডিং ষ্টেট দেখুওৱা
     resultBox.style.display = 'none';
     loadingText.style.display = 'block';
     verifyBtn.disabled = true;
     verifyBtn.textContent = "Verifying...";
 
     reader.onload = async function() {
-      // Base64 ডাটা অংশটো বেলেগ কৰা
       const base64Data = reader.result.split(',')[1];
       
-      // বাছনি কৰা ভাষা আৰু কেটাগৰি লোৱা
       const selectedLang = document.getElementById('language').value;
       const selectedCategories = Array.from(document.querySelectorAll('.checkbox-group input:checked'))
                                       .map(cb => cb.value).join(', ') || "General Information";
 
       try {
-        // Netlify Serverless Function লৈ ৰিকুৱেষ্ট পঠিওৱা
         const response = await fetch('/.netlify/functions/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -161,13 +157,11 @@
           throw new Error(result.error || "Failed to get response from server.");
         }
 
-        // ৰিজাল্ট দেখুওৱা
         loadingText.style.display = 'none';
         verifyBtn.disabled = false;
         verifyBtn.textContent = "Verify Now";
         resultBox.style.display = 'block';
 
-        // AI ৰ উত্তৰ অনুসৰি ৰঙ সলনি কৰা
         if (result.status && result.status.toLowerCase().includes("flag")) {
           resultBox.className = "result-area bad";
         } else {
@@ -176,6 +170,9 @@
         
         resultTitle.textContent = result.title || "Analysis Complete";
         resultDesc.textContent = result.description || "No description provided.";
+        
+        // Origin টোত ডাটা বহুওৱা হ'ল
+        resultOrigin.textContent = "📍 Origin: " + (result.origin || "Unknown");
 
       } catch (error) {
         loadingText.style.display = 'none';
