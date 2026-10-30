@@ -1,4 +1,3 @@
-// netlify/functions/verify.js
 export const handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
@@ -28,15 +27,15 @@ export const handler = async (event) => {
       Your response MUST be a JSON object with this exact structure:
       {
         "status": "Verified" or "Flagged",
-        "title": "Short title (e.g., Verified as: Information)",
-        "origin": "Detected origin of the content",
-        "description": "Detailed explanation in ${selectedLang}.",
-        "confidence": "High" or "Medium" or "Low"
+        "title": "Short title",
+        "origin": "Detected origin",
+        "description": "Detailed explanation",
+        "confidence": "High"
       }
     `;
 
-    // ✅ মডেলের নাম আপডেট করা হয়েছে
-    const model = "gemini-2.5-flash"; 
+    // 💡 ছেম প্ৰম্পট (Stable Model) ব্যৱহাৰ কৰা হ'ল
+    const model = "gemini-1.5-flash"; 
     
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -56,17 +55,30 @@ export const handler = async (event) => {
     );
 
     const data = await response.json();
+    console.log("Gemini API Response:", JSON.stringify(data)); // নেটলিফাই লগত চাবলৈ
 
-    // ✅ নিরাপত্তা যাচাই: candidates অ্যারে আছে কিনা
-    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-      const blockReason = data.promptFeedback?.blockReason || "Unknown reason";
+    // 🚨 যদি এপিআইৰ পৰা ভুল আহে, তেন্তে আচল কাৰণটো দেখুওৱা হ'ব
+    if (data.error) {
       return {
         statusCode: 200,
         body: JSON.stringify({
           status: "Flagged",
-          title: "Content Blocked or Unreadable",
-          description: "AI couldn't analyze this file. Reason: " + blockReason,
-          origin: "Unknown"
+          title: "API Error",
+          origin: "Unknown",
+          description: "Gemini API Error: " + data.error.message
+        })
+      };
+    }
+
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      const blockReason = data.promptFeedback?.blockReason || "Safety Filter or Unknown issue";
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          status: "Flagged",
+          title: "Content Blocked",
+          origin: "Unknown",
+          description: "Reason: " + blockReason
         })
       };
     }
@@ -79,10 +91,10 @@ export const handler = async (event) => {
     };
 
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Server Error:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Failed to analyze the file: " + error.message })
+      body: JSON.stringify({ error: "Failed to analyze: " + error.message })
     };
   }
 };
