@@ -1,0 +1,8 @@
+{
+  "name": "sarbobhoimo-tools",
+  "version": "1.0.0",
+  "description": "Payment Tracker and Verification Tool",
+  "dependencies": {
+    "@netlify/blobs": "^6.5.0"
+  }
+}
