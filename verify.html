@@ -3,8 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Verification Tool</title>
- <link rel="manifest" href="/manifest-verify.json">
+<title>Verification Tool | Sarbobhoimo</title>
+<link rel="manifest" href="/manifest-verify.json">
+<!-- লাইব্ৰেৰীসমূহ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
 <style>
   * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   body { margin: 0; background: #f8fafc; color: #1e293b; padding-bottom: 40px; }
@@ -13,9 +16,7 @@
   header p { margin: 6px 0 0; font-size: 14px; opacity: 0.8; }
   
   main { padding: 16px; max-width: 600px; margin: 0 auto; }
-  
   .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 16px; }
-  
   .section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
   
   .upload-area { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 30px 20px; text-align: center; cursor: pointer; transition: 0.3s; display: block; }
@@ -35,28 +36,37 @@
   button.verify-btn:disabled { background: #94a3b8; cursor: not-allowed; }
   
   .loading { display: none; text-align: center; margin-top: 20px; font-weight: 600; color: #3b82f6; }
-  
   .result-area { display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 16px; margin-top: 20px; }
   .result-area.bad { background: #fef2f2; border-color: #fecaca; }
   .result-area h3 { margin: 0 0 8px; color: #166534; font-size: 18px; }
   .result-area.bad h3 { color: #991b1b; }
-  .result-area p { margin: 0; font-size: 14px; color: #334155; line-height: 1.5; }
+  .result-area p { margin: 0; font-size: 14px; color: #334155; line-height: 1.5; margin-bottom: 6px; white-space: pre-wrap; }
+
+  /* Paywall Modal */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+  .modal-content { background: white; border-radius: 12px; padding: 24px; max-width: 400px; width: 100%; text-align: center; }
+  .modal-content h2 { color: #1e293b; margin-top: 0; }
+  .modal-content p { color: #64748b; font-size: 14px; margin-bottom: 20px; }
+  .pay-btn { display: block; background: #10b981; color: white; text-decoration: none; padding: 12px; border-radius: 8px; font-weight: 600; margin-bottom: 10px; }
+  .code-input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; text-align: center; font-size: 16px; text-transform: uppercase; }
+  .unlock-btn { width: 100%; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+  .close-btn { margin-top: 15px; color: #94a3b8; font-size: 13px; background: none; border: none; cursor: pointer; text-decoration: underline; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>🔍 Verification Tool</h1>
-  <p>Simple but profound. Verify information in any format.</p>
+  <p>Verify Information, Fraud & Misinformation</p>
 </header>
 
 <main>
   <div class="card">
-    <div class="section-title">1. Upload File</div>
+    <div class="section-title">1. Upload File (Photo, PDF, Video, Audio)</div>
     <label class="upload-area" for="fileUpload">
-      <input type="file" id="fileUpload" accept="image/*, application/pdf, video/*">
-      <p>Click to <span>Browse</span> or drag & drop</p>
-      <p style="font-size: 12px; margin-top: 8px; color: #94a3b8;">Supports Photo, PDF, Video</p>
+      <input type="file" id="fileUpload" accept="image/*, application/pdf, video/*, audio/*">
+      <p>Click to <span>Browse</span></p>
+      <p style="font-size: 12px; margin-top: 8px; color: #94a3b8;">Large files are automatically optimized.</p>
     </label>
     <div id="fileName" style="margin-top: 10px; font-size: 13px; color: #3b82f6; font-weight: 600; text-align: center;"></div>
 
@@ -66,6 +76,7 @@
       <label><input type="checkbox" value="Misinformation"> Misinformation</label>
       <label><input type="checkbox" value="Disinformation"> Disinformation</label>
       <label><input type="checkbox" value="Knowledge"> Knowledge</label>
+      <label style="grid-column: span 2;"><input type="checkbox" value="Fraud / Scam"> Fraud / Scam</label>
     </div>
 
     <label for="language">3. Set Language</label>
@@ -77,22 +88,36 @@
     </select>
 
     <button class="verify-btn" id="verifyBtn">Verify Now</button>
-
-    <div class="loading" id="loadingText">🔄 Analyzing content with AI... Please wait.</div>
+    <p id="limitText" style="text-align: center; font-size: 12px; color: #64748b; margin-top: 10px;"></p>
+    <div class="loading" id="loadingText">🔄 Analyzing content...</div>
 
     <div class="result-area" id="resultBox">
-      <h3 id="resultTitle">Verified as: Information</h3>
-      <p id="resultDesc">The uploaded content appears to be factual and reliable based on our analysis.</p>
-     <p id="resultOrigin"
-      style="font-size: 13px;
-      font-weight: 600;
-      color: #475569;
-      margin-bottom: 8px;"> </p>
+      <h3 id="resultTitle"></h3>
+      <p id="resultOrigin" style="font-weight: 600; color: #475569;"></p>
+      <p id="resultDesc"></p>
     </div>
   </div>
 </main>
 
+<!-- Paywall Modal -->
+<div class="modal-overlay" id="paywallModal">
+  <div class="modal-content">
+    <h2>Daily Limit Reached!</h2>
+    <p>You have used your 3 free verifications for today. Upgrade to Pro for unlimited access.</p>
+    <a href="YOUR_RAZORPAY_LINK_HERE" target="_blank" class="pay-btn">Pay ₹33 / Month</a>
+    <div style="margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+      <p style="margin-bottom: 8px;">Already paid? Enter Secret Code:</p>
+      <input type="text" id="proCodeInput" class="code-input" placeholder="PRO33">
+      <button class="unlock-btn" onclick="unlockPro()">Unlock Pro</button>
+    </div>
+    <button class="close-btn" onclick="document.getElementById('paywallModal').style.display='none'">Close</button>
+  </div>
+</div>
+
 <script>
+  // PDF.js ৱাৰ্কাৰ ছেটআপ
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
   const fileInput = document.getElementById('fileUpload');
   const fileNameDisplay = document.getElementById('fileName');
   const verifyBtn = document.getElementById('verifyBtn');
@@ -100,9 +125,48 @@
   const resultBox = document.getElementById('resultBox');
   const resultTitle = document.getElementById('resultTitle');
   const resultDesc = document.getElementById('resultDesc');
-  const resultOrigin = document.getElementById('resultOrigin'); // নতুন
+  const resultOrigin = document.getElementById('resultOrigin');
+  const limitText = document.getElementById('limitText');
+  const paywallModal = document.getElementById('paywallModal');
 
-  // ফাইল বাছনি কৰিলে নামটো দেখুওৱা
+  const DAILY_LIMIT = 3;
+  const PRO_CODE = "PRO33"; 
+  
+  let isPro = localStorage.getItem('verify_isPro') === 'true';
+  let useCount = parseInt(localStorage.getItem('verify_useCount') || '0');
+  let lastUseDate = localStorage.getItem('verify_lastUseDate');
+  
+  let today = new Date().toDateString();
+  if (lastUseDate !== today) {
+    useCount = 0;
+    localStorage.setItem('verify_useCount', '0');
+    localStorage.setItem('verify_lastUseDate', today);
+  }
+
+  function updateLimitText() {
+    if (isPro) {
+      limitText.textContent = "⭐ Pro User: Unlimited Verifications";
+      limitText.style.color = "#10b981";
+    } else {
+      limitText.textContent = `Free verifications left today: ${Math.max(0, DAILY_LIMIT - useCount)}`;
+    }
+  }
+  
+  function unlockPro() {
+    let inputCode = document.getElementById('proCodeInput').value.trim().toUpperCase();
+    if (inputCode === PRO_CODE) {
+      localStorage.setItem('verify_isPro', 'true');
+      isPro = true;
+      paywallModal.style.display = 'none';
+      updateLimitText();
+      alert("Success! Pro features unlocked.");
+    } else {
+      alert("Invalid code.");
+    }
+  }
+
+  updateLimitText();
+
   fileInput.addEventListener('change', function(e) {
     if (e.target.files.length > 0) {
       fileNameDisplay.textContent = "📎 Selected: " + e.target.files[0].name;
@@ -111,8 +175,77 @@
     }
   });
 
-  // Verify Button Action
-  verifyBtn.addEventListener('click', function() {
+  // ==========================================
+  // 🛠️ SMARTER FILE PROCESSING FUNCTIONS
+  // ==========================================
+
+  // 1. Image Compressor (Automatic downscale to < 1MB)
+  async function compressImage(file) {
+    const options = {
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1920,
+      useWebWorker: true
+    };
+    try {
+      const compressedBlob = await imageCompression(file, options);
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve({ data: reader.result.split(',')[1], mime: "image/jpeg" });
+        reader.readAsDataURL(compressedBlob);
+      });
+    } catch (error) {
+      console.error("Image compression error:", error);
+      throw new Error("Failed to compress image.");
+    }
+  }
+
+  // 2. PDF Text Extractor (Reads text instead of sending massive file)
+  async function extractPDFText(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+    let fullText = "";
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(" ");
+      fullText += `\n--- Page ${i} ---\n${pageText}`;
+    }
+    return fullText;
+  }
+
+  // 3. Video Frame Extractor (Grabs a single representative frame)
+  function extractVideoFrame(file) {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.src = URL.createObjectURL(file);
+      video.muted = true;
+      video.playsInline = true;
+      
+      video.onloadeddata = () => { video.currentTime = Math.min(2, video.duration / 2); };
+      
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7); 
+        URL.revokeObjectURL(video.src);
+        resolve({ data: dataUrl.split(',')[1], mime: 'image/jpeg' });
+      };
+      video.onerror = () => reject("Video format not supported by browser.");
+    });
+  }
+
+  // ==========================================
+  // 🚀 MAIN VERIFY BUTTON LOGIC
+  // ==========================================
+  verifyBtn.addEventListener('click', async function() {
+    if (!isPro && useCount >= DAILY_LIMIT) {
+      paywallModal.style.display = 'flex';
+      return;
+    }
     if (fileInput.files.length === 0) {
       alert("Please upload a file first.");
       return;
@@ -120,72 +253,97 @@
 
     const file = fileInput.files[0];
     
-    if (file.size > 20 * 1024 * 1024) {
-        alert("File is too large. Please upload a file smaller than 20MB.");
-        return;
-    }
-
-    const reader = new FileReader();
-
     resultBox.style.display = 'none';
     loadingText.style.display = 'block';
     verifyBtn.disabled = true;
-    verifyBtn.textContent = "Verifying...";
+    verifyBtn.textContent = "Processing...";
 
-    reader.onload = async function() {
-      const base64Data = reader.result.split(',')[1];
-      
+    try {
+      let payloadData = null;
+      let payloadMime = file.type;
+
+      // 🧠 SMART PROCESSING BASED ON FILE TYPE
+      if (file.type.startsWith('image/')) {
+        loadingText.textContent = "📸 Compressing image...";
+        const result = await compressImage(file);
+        payloadData = result.data;
+        payloadMime = result.mime;
+
+      } else if (file.type === 'application/pdf') {
+        loadingText.textContent = "📄 Extracting text from PDF...";
+        const extractedText = await extractPDFText(file);
+        // AI-ক ফাইল নহয়, চিধাই টেক্সট পঠিওৱা হ'ব
+        payloadData = extractedText; 
+        payloadMime = "text/plain";
+
+      } else if (file.type.startsWith('video/')) {
+        loadingText.textContent = "🎥 Extracting video frame...";
+        const frame = await extractVideoFrame(file);
+        payloadData = frame.data;
+        payloadMime = frame.mime;
+
+      } else if (file.type.startsWith('audio/')) {
+        // অডিঅ'ৰ বাবে ৪.৫ MB তকৈ সৰু হ'লে ইয়াক চিধাই পঠিওৱা হ'ব
+        if (file.size > 4.5 * 1024 * 1024) {
+           throw new Error("Audio is too large. Please upload a shorter audio clip (< 4.5MB).");
+        }
+        const reader = new FileReader();
+        payloadData = await new Promise((resolve) => {
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.readAsDataURL(file);
+        });
+      } else {
+        throw new Error("Unsupported file format.");
+      }
+
+      // 🚀 SENDING TO NETLIFY FUNCTION
+      loadingText.textContent = "🧠 AI is analyzing... Please wait.";
       const selectedLang = document.getElementById('language').value;
       const selectedCategories = Array.from(document.querySelectorAll('.checkbox-group input:checked'))
                                       .map(cb => cb.value).join(', ') || "General Information";
 
-      try {
-        const response = await fetch('/.netlify/functions/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            base64Data: base64Data,
-            mimeType: file.type,
-            language: selectedLang,
-            category: selectedCategories
-          })
-        });
+      const response = await fetch('/.netlify/functions/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64Data: payloadData,
+          mimeType: payloadMime,
+          language: selectedLang,
+          category: selectedCategories
+        })
+      });
 
-        const result = await response.json();
+      const result = await response.json();
+      if (!response.ok || result.error) throw new Error(result.error || "Server Error");
 
-        if (!response.ok || result.error) {
-          throw new Error(result.error || "Failed to get response from server.");
-        }
-
-        loadingText.style.display = 'none';
-        verifyBtn.disabled = false;
-        verifyBtn.textContent = "Verify Now";
-        resultBox.style.display = 'block';
-
-        if (result.status && result.status.toLowerCase().includes("flag")) {
-          resultBox.className = "result-area bad";
-        } else {
-          resultBox.className = "result-area";
-        }
-        
-        resultTitle.textContent = result.title || "Analysis Complete";
-        resultDesc.textContent = result.description || "No description provided.";
-        
-        // Origin টোত ডাটা বহুওৱা হ'ল
-        resultOrigin.textContent = "📍 Origin: " + (result.origin || "Unknown");
-
-      } catch (error) {
-        loadingText.style.display = 'none';
-        verifyBtn.disabled = false;
-        verifyBtn.textContent = "Verify Now";
-        alert("Error: " + error.message + "\n\nMake sure you have added the GEMINI_API_KEY in Netlify environment variables.");
-        console.error(error);
+      if (!isPro) {
+        useCount++;
+        localStorage.setItem('verify_useCount', useCount.toString());
+        updateLimitText();
       }
-    };
 
-    reader.readAsDataURL(file);
+      loadingText.style.display = 'none';
+      verifyBtn.disabled = false;
+      verifyBtn.textContent = "Verify Now";
+      resultBox.style.display = 'block';
+
+      if (result.status && result.status.toLowerCase().includes("flag")) {
+        resultBox.className = "result-area bad";
+      } else {
+        resultBox.className = "result-area";
+      }
+      
+      resultTitle.textContent = result.title || "Analysis Complete";
+      resultDesc.textContent = result.description || "No description provided.";
+      resultOrigin.textContent = "📍 Origin: " + (result.origin || "Unknown");
+
+    } catch (error) {
+      loadingText.style.display = 'none';
+      verifyBtn.disabled = false;
+      verifyBtn.textContent = "Verify Now";
+      alert("Error: " + error.message);
+    }
   });
 </script>
-
 </body>
 </html>
