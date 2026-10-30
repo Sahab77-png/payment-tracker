@@ -35,7 +35,7 @@ export const handler = async (event) => {
     `;
 
     // 💡 ছেম প্ৰম্পট (Stable Model) ব্যৱহাৰ কৰা হ'ল
-    const model = "gemini-1.5-flash"; 
+    const model = "gemini-flash-latest"; 
     
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
