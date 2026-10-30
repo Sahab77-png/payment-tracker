@@ -1,6 +1,6 @@
 {
   "name": "Sarbobhoimo Verification Tool",
-  "short_name": "VerifyAI",
+  "short_name": "VerifyTool",
   "start_url": "/verify.html",
   "display": "standalone",
   "background_color": "#f8fafc",
