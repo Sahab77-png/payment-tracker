@@ -18,21 +18,25 @@ export const handler = async (event) => {
     const langMap = { en: "English", as: "Assamese", hi: "Hindi", bn: "Bengali" };
     const selectedLang = langMap[language] || "English";
 
-    const prompt = `
-      You are an expert fact-checker. Analyze the provided media file.
-      Check for information, misinformation, disinformation, or general knowledge.
-      The user has categorized this as: ${category || "General Information"}.
-      Respond STRICTLY in ${selectedLang}.
-      
-      Your response MUST be a JSON object with this exact structure:
-      {
-        "status": "Verified" or "Flagged",
-        "title": "Short title (e.g., Verified as: Information)",
-        "description": "Detailed explanation in ${selectedLang}.",
-        "confidence": "High" or "Medium" or "Low"
-      }
-    `;
-
+    
+const prompt = `
+  You are an expert fact-checker. Analyze the provided media file.
+  Check for information, misinformation, disinformation, or general knowledge.
+  The user has categorized this as: ${category || "General Information"}.
+  
+  CRITICAL: Identify the ORIGIN of this content (e.g., Original Photo, Social Media Screenshot, AI-Generated Image, Official Document, etc.).
+  
+  Respond STRICTLY in ${selectedLang}.
+  
+  Your response MUST be a JSON object with this exact structure:
+  {
+    "status": "Verified" or "Flagged",
+    "title": "Short title (e.g., Verified as: Information)",
+    "origin": "Detected origin of the content",
+    "description": "Detailed explanation in ${selectedLang}.",
+    "confidence": "High" or "Medium" or "Low"
+  }
+`;
     // Gemini API লৈ ৰিকুৱেষ্ট পঠিওৱা
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
