@@ -1,0 +1,15 @@
+{
+  "name": "Sarbobhoimo Verification Tool",
+  "short_name": "VerifyAI",
+  "start_url": "/verify.html",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3135/3135679.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
