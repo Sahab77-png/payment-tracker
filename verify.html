@@ -104,7 +104,13 @@
   <div class="modal-content">
     <h2>Daily Limit Reached!</h2>
     <p>You have used your 3 free verifications for today. Upgrade to Pro for unlimited access.</p>
-    <a href="YOUR_RAZORPAY_LINK_HERE" target="_blank" class="pay-btn">Pay ₹33 / Month</a>
+    
+    <!-- ⚠️ ইমেইল ইনপুট দিয়াটো অতি প্ৰয়োজনীয় -->
+    <input type="email" id="userEmail" class="code-input" placeholder="Enter your Email" style="text-transform: none; margin-bottom: 12px;">
+    
+    <!-- পেমেণ্ট বুটাম -->
+    <button onclick="startPayment()" id="payBtn" class="pay-btn" style="border: none; width: 100%; cursor: pointer; font-size: 16px;">Pay ₹33 / Month</button>
+    
     <div style="margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
       <p style="margin-bottom: 8px;">Already paid? Enter Secret Code:</p>
       <input type="text" id="proCodeInput" class="code-input" placeholder="PRO33">
@@ -113,7 +119,6 @@
     <button class="close-btn" onclick="document.getElementById('paywallModal').style.display='none'">Close</button>
   </div>
 </div>
-
 <script>
   // PDF.js ৱাৰ্কাৰ ছেটআপ
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -128,9 +133,10 @@
   const resultOrigin = document.getElementById('resultOrigin');
   const limitText = document.getElementById('limitText');
   const paywallModal = document.getElementById('paywallModal');
+  const payBtn = document.getElementById('payBtn'); // নতুন Pay বুটাম
 
   const DAILY_LIMIT = 3;
-  const PRO_CODE = "PRO33"; 
+  const PRO_CODE = "PRO33"; // মেনুৱেল ক'ড (যদি কেতিয়াবা লগত দিব বিচাৰে)
   
   let isPro = localStorage.getItem('verify_isPro') === 'true';
   let useCount = parseInt(localStorage.getItem('verify_useCount') || '0');
@@ -152,6 +158,7 @@
     }
   }
   
+  // মেনুৱেল ক'ড আনলক (প্ৰয়োজন হ'লে)
   function unlockPro() {
     let inputCode = document.getElementById('proCodeInput').value.trim().toUpperCase();
     if (inputCode === PRO_CODE) {
@@ -165,7 +172,71 @@
     }
   }
 
-  updateLimitText();
+  // 🚀 ১. চাৰ্ভাৰৰ পৰা Pro ষ্টেটাছ চেক কৰা (ইমেইলৰ জৰিয়তে)
+  async function checkProStatus() {
+    let savedEmail = localStorage.getItem('user_email');
+    if (savedEmail) {
+      document.getElementById('userEmail').value = savedEmail; // ইনপুটত ছেট কৰা
+      
+      try {
+        const response = await fetch(`/.netlify/functions/check-pro?email=${encodeURIComponent(savedEmail)}`);
+        const data = await response.json();
+        if (data.isPro) {
+          isPro = true;
+          localStorage.setItem('verify_isPro', 'true');
+          updateLimitText();
+        }
+      } catch (err) {
+        console.error("Pro check failed", err);
+      }
+    }
+  }
+
+  // 🚀 ২. পেমেণ্ট বুটামত ক্লিক কৰিলে (Auto Payment)
+  async function startPayment() {
+    const email = document.getElementById('userEmail').value.trim();
+    if (!email || !email.includes('@')) {
+      alert("Please enter a valid email address to proceed.");
+      return;
+    }
+
+    localStorage.setItem('user_email', email); // ইমেইল ছেভ কৰি ৰখা
+
+    payBtn.textContent = "Loading...";
+    payBtn.disabled = true;
+
+    try {
+      const response = await fetch('/.netlify/functions/create-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      });
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url; // ৰাজপে পেজলৈ যাওক
+      } else {
+        alert("Failed to create payment link. Please try again.");
+        payBtn.textContent = "Pay ₹33 / Month";
+        payBtn.disabled = false;
+      }
+    } catch (error) {
+      alert("Error: " + error.message);
+      payBtn.textContent = "Pay ₹33 / Month";
+      payBtn.disabled = false;
+    }
+  }
+
+  // পেজ লোড হ'লে Pro ষ্টেটাছ চেক কৰা আৰু পেমেণ্ট ছাক্সেছৰ বাবে অপেক্ষা কৰা
+  window.addEventListener('DOMContentLoaded', () => {
+    checkProStatus();
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('payment') === 'success') {
+      alert("Payment successful! We are updating your Pro status. Please wait a few seconds...");
+      setTimeout(checkProStatus, 3000); // ৱেবহুক প্ৰচেছ হ'বলৈ ৩ ছেকেণ্ড সময় দিয়া
+    }
+  });
 
   fileInput.addEventListener('change', function(e) {
     if (e.target.files.length > 0) {
@@ -176,16 +247,10 @@
   });
 
   // ==========================================
-  // 🛠️ SMARTER FILE PROCESSING FUNCTIONS
+  // 🛠️ FILE PROCESSING FUNCTIONS (আগৰ দৰেই থাকিব)
   // ==========================================
-
-  // 1. Image Compressor (Automatic downscale to < 1MB)
   async function compressImage(file) {
-    const options = {
-      maxSizeMB: 1,
-      maxWidthOrHeight: 1920,
-      useWebWorker: true
-    };
+    const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
     try {
       const compressedBlob = await imageCompression(file, options);
       return new Promise((resolve) => {
@@ -194,17 +259,14 @@
         reader.readAsDataURL(compressedBlob);
       });
     } catch (error) {
-      console.error("Image compression error:", error);
       throw new Error("Failed to compress image.");
     }
   }
 
-  // 2. PDF Text Extractor (Reads text instead of sending massive file)
   async function extractPDFText(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
     let fullText = "";
-    
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
@@ -214,7 +276,6 @@
     return fullText;
   }
 
-  // 3. Video Frame Extractor (Grabs a single representative frame)
   function extractVideoFrame(file) {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
@@ -222,9 +283,7 @@
       video.src = URL.createObjectURL(file);
       video.muted = true;
       video.playsInline = true;
-      
       video.onloadeddata = () => { video.currentTime = Math.min(2, video.duration / 2); };
-      
       video.onseeked = () => {
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
@@ -252,7 +311,6 @@
     }
 
     const file = fileInput.files[0];
-    
     resultBox.style.display = 'none';
     loadingText.style.display = 'block';
     verifyBtn.disabled = true;
@@ -262,31 +320,22 @@
       let payloadData = null;
       let payloadMime = file.type;
 
-      // 🧠 SMART PROCESSING BASED ON FILE TYPE
       if (file.type.startsWith('image/')) {
         loadingText.textContent = "📸 Compressing image...";
         const result = await compressImage(file);
         payloadData = result.data;
         payloadMime = result.mime;
-
       } else if (file.type === 'application/pdf') {
         loadingText.textContent = "📄 Extracting text from PDF...";
-        const extractedText = await extractPDFText(file);
-        // AI-ক ফাইল নহয়, চিধাই টেক্সট পঠিওৱা হ'ব
-        payloadData = extractedText; 
+        payloadData = await extractPDFText(file); 
         payloadMime = "text/plain";
-
       } else if (file.type.startsWith('video/')) {
         loadingText.textContent = "🎥 Extracting video frame...";
         const frame = await extractVideoFrame(file);
         payloadData = frame.data;
         payloadMime = frame.mime;
-
       } else if (file.type.startsWith('audio/')) {
-        // অডিঅ'ৰ বাবে ৪.৫ MB তকৈ সৰু হ'লে ইয়াক চিধাই পঠিওৱা হ'ব
-        if (file.size > 4.5 * 1024 * 1024) {
-           throw new Error("Audio is too large. Please upload a shorter audio clip (< 4.5MB).");
-        }
+        if (file.size > 4.5 * 1024 * 1024) throw new Error("Audio is too large. Please upload a shorter audio clip (< 4.5MB).");
         const reader = new FileReader();
         payloadData = await new Promise((resolve) => {
           reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -296,7 +345,6 @@
         throw new Error("Unsupported file format.");
       }
 
-      // 🚀 SENDING TO NETLIFY FUNCTION
       loadingText.textContent = "🧠 AI is analyzing... Please wait.";
       const selectedLang = document.getElementById('language').value;
       const selectedCategories = Array.from(document.querySelectorAll('.checkbox-group input:checked'))
