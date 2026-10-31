@@ -14,7 +14,7 @@ exports.handler = async (event) => {
 
     const prompt = `
       You are an elite fact-checker, cyber-security analyst, and plagiarism detector. 
-      I am providing you with a file (Image, Video, Audio, or PDF). 
+      I am providing you with content (Image, Video, Audio, or Document Text). 
       
       YOUR MISSION: Analyze the ENTIRE content meticulously. Do not miss a single detail.
       
@@ -25,8 +25,8 @@ exports.handler = async (event) => {
       The user suspects this category: ${category || "General Information"}.
       
       CRITICAL INSTRUCTIONS FOR DEEP ANALYSIS:
-      - IF IT IS A PDF/DOCUMENT: You MUST read page by page. If you find an issue, you MUST state the exact PAGE NUMBER, PARAGRAPH, and provide the EXACT QUOTE of the false claim.
-      - IF IT IS A VIDEO/AUDIO: You MUST state the exact TIMESTAMP (e.g., "At 00:45...") and quote exactly what was said.
+      - IF IT IS A TEXT/DOCUMENT: Read it thoroughly. If you find an issue, you MUST state the specific PARAGRAPH, and provide the EXACT QUOTE of the false claim.
+      - IF IT IS A VIDEO/AUDIO: State the exact TIMESTAMP (e.g., "At 00:45...") and quote exactly what was said.
       - IF IT IS AN IMAGE: Point out the specific visual element or text that is misleading.
       - DO NOT give a generic answer. Be highly specific.
       
@@ -42,18 +42,24 @@ exports.handler = async (event) => {
       }
     `;
 
+    let contentParts = [{ text: prompt }];
+
+    // 🚨 এখানে PDF এর টেক্সট এবং ফাইল আলাদা করে হ্যান্ডেল করা হয়েছে
+    if (mimeType === "text/plain") {
+      contentParts.push({ text: "Document Content to analyze:\n\n" + base64Data });
+    } else {
+      contentParts.push({ 
+        inlineData: { mimeType: mimeType, data: base64Data } 
+      });
+    }
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType: mimeType, data: base64Data } }
-            ]
-          }],
+          contents: [{ parts: contentParts }],
           generationConfig: { responseMimeType: "application/json" }
         })
       }
