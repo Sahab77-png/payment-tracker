@@ -1,3 +1,4 @@
+// netlify/functions/verify.js
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
@@ -44,12 +45,30 @@ exports.handler = async (event) => {
 
     let contentParts = [{ text: prompt }];
 
-    // 🚨 এখানে PDF এর টেক্সট এবং ফাইল আলাদা করে হ্যান্ডেল করা হয়েছে
     if (mimeType === "text/plain") {
       contentParts.push({ text: "Document Content to analyze:\n\n" + base64Data });
     } else {
+      // 🚨 Base64 Data চাফাই কৰাৰ লজিক (Sanitizer)
+      let cleanBase64 = base64Data;
+
+      // যদি ভুলবশতঃ ফাইলৰ প্ৰিফিক্স (data:image/jpeg;base64,) সোমাই আহে, তাক আঁতৰোৱা
+      if (cleanBase64.includes(',')) {
+        cleanBase64 = cleanBase64.split(',')[1];
+      }
+
+      // URL-safe base64 আখৰবোৰ (+ আৰু /) লৈ ৰূপান্তৰ কৰা
+      cleanBase64 = cleanBase64.replace(/-/g, '+').replace(/_/g, '/');
+
+      // যিকোনো ধৰণৰ স্পেচ, নতুন লাইন বা ভুল আখৰ আঁতৰোৱা
+      cleanBase64 = cleanBase64.replace(/[^A-Za-z0-9+/=]/g, '');
+
+      // পেডিং (=) নাথাকিলে যোগ কৰা
+      while (cleanBase64.length % 4 !== 0) {
+        cleanBase64 += '=';
+      }
+
       contentParts.push({ 
-        inlineData: { mimeType: mimeType, data: base64Data } 
+        inlineData: { mimeType: mimeType, data: cleanBase64 } 
       });
     }
 
